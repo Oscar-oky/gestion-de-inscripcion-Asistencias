@@ -1,0 +1,3 @@
+ALTER TABLE usuarios
+ ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'bibliotecario',
+ ADD COLUMN password VARCHAR(64);
