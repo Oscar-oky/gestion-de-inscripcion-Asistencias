@@ -1,5 +1,5 @@
 # src/execute_events.py
-# VERSIÓN FINAL DEFINITIVA + VER INSCRITOS - PROYECTO PERFECTO PARA OPTATIVA POO
+# VERSIÓN FINAL OFICIAL - 100% COMPLETO + VER INSCRITOS + CONTRASEÑA MAESTRA
 # Oscar Alexandro Morales Galván - ISW-25 - ENTREGA 10/10/2025
 
 import tkinter as tk
@@ -9,6 +9,9 @@ from db_connection import get_conn
 
 def hash_password(pwd):
     return hashlib.sha256(pwd.encode()).hexdigest()
+
+# ======================= CONTRASEÑA MAESTRA =======================
+CONTRASEÑA_MAESTRA = "upsrc2025"  # Cambia esta si quieres
 
 # ======================= CLASES POO =======================
 class Persona:
@@ -34,7 +37,7 @@ current_user = None
 root = None
 tree_global = None
 
-# ======================= NUEVA FUNCIÓN: VER INSCRITOS POR EVENTO =======================
+# ======================= VER INSCRITOS POR EVENTO =======================
 def ver_inscritos():
     if current_user.rol != "organizador":
         messagebox.showwarning("Acceso denegado", "Solo los organizadores pueden ver la lista de inscritos")
@@ -49,7 +52,6 @@ def ver_inscritos():
     evento_id = evento_data[0]
     titulo_evento = evento_data[1]
 
-    # Ventana con lista de inscritos
     win = tk.Toplevel(root)
     win.title(f"Inscritos - {titulo_evento}")
     win.geometry("1000x720")
@@ -208,12 +210,12 @@ def crear_evento():
 
     tk.Button(win, text="GUARDAR EVENTO", bg="#4CAF50", fg="white", font=("bold", 14), command=guardar).pack(pady=25)
 
-# ======================= REGISTRO Y LOGIN (completo) =======================
+# ======================= REGISTRO CON CONTRASEÑA MAESTRA =======================
 def registrar_usuario():
     global current_user
     win = tk.Toplevel(root)
     win.title("Registro de Usuario")
-    win.geometry("500x700")
+    win.geometry("500x750")
     win.configure(bg="#f0f8ff")
     win.grab_set()
 
@@ -245,34 +247,45 @@ def registrar_usuario():
         rol = rol_var.get()
 
         if not all([nombre, apellidos, email, pwd1]) or pwd1 != pwd2:
-            messagebox.showerror("Error", "Verifica los datos")
+            messagebox.showerror("Error", "Verifica los datos y que las contraseñas coincidan")
             return
+
+        if rol == "organizador":
+            clave = simpledialog.askstring("Acceso Restringido", 
+                "Solo personal autorizado puede crear cuenta de organizador\n\nIngresa la contraseña maestra:", 
+                show="*", parent=win)
+            if clave != CONTRASEÑA_MAESTRA:
+                messagebox.showerror("Acceso Denegado", "Contraseña maestra incorrecta.")
+                return
+            messagebox.showinfo("Autorizado", "Contraseña correcta. Procediendo...")
 
         conn = get_conn()
         cur = conn.cursor()
         try:
             hash_pwd = hash_password(pwd1)
             if rol == "organizador":
-                dept = simpledialog.askstring("Departamento", "Departamento:", parent=win)
+                dept = simpledialog.askstring("Departamento", "Ingresa tu departamento:", parent=win)
+                if not dept: dept = "Sin especificar"
                 cur.execute("INSERT INTO organizadores (nombre, apellidos, email, password_hash, departamento) VALUES (%s, %s, %s, %s, %s)",
-                            (nombre, apellidos, email, hash_pwd, dept or "Sin departamento"))
+                            (nombre, apellidos, email, hash_pwd, dept))
                 current_user = Organizador(cur.lastrowid, nombre, apellidos, email, dept)
             else:
                 cur.execute("INSERT INTO usuarios (nombre, apellidos, email, password_hash, telefono) VALUES (%s, %s, %s, %s, %s)",
                             (nombre, apellidos, email, hash_pwd, telefono or None))
                 current_user = Usuario(cur.lastrowid, nombre, apellidos, email)
             conn.commit()
-            messagebox.showinfo("ÉXITO", "Cuenta creada")
+            messagebox.showinfo("ÉXITO", f"Cuenta de {rol.upper()} creada correctamente")
             win.destroy()
             iniciar_sesion_exitoso()
         except Exception as e:
-            messagebox.showerror("Error", f"Usuario ya existe: {e}")
+            messagebox.showerror("Error", f"Correo ya registrado: {e}")
         finally:
             cur.close()
             conn.close()
 
     tk.Button(win, text="CREAR CUENTA", bg="#4CAF50", fg="white", font=("bold", 14), width=30, command=guardar).pack(pady=30)
 
+# ======================= LOGIN =======================
 def login():
     global current_user
     if messagebox.askyesno("Sistema de Eventos", "¿Ya tienes una cuenta?"):
@@ -302,7 +315,7 @@ def login():
     else:
         registrar_usuario()
 
-# ======================= INTERFAZ PRINCIPAL CON BOTÓN "VER INSCRITOS" =======================
+# ======================= INTERFAZ PRINCIPAL =======================
 def iniciar_sesion_exitoso():
     global tree_global
     for w in root.winfo_children():
@@ -310,13 +323,11 @@ def iniciar_sesion_exitoso():
 
     root.title(f"Eventos UPSR - {current_user.nombre} {current_user.apellidos} ({current_user.rol.upper()})")
 
-    # Header
     header = tk.Frame(root, bg="#1B5E20", height=110)
     header.pack(fill="x")
     tk.Label(header, text="Gestión de Inscripción y Asistencia a Eventos", font=("Helvetica", 18, "bold"), fg="white", bg="#1B5E20").pack(pady=20)
     tk.Label(header, text="Oscar Alexandro Morales Galván | ISW-25 | 10/10/2025", fg="#c8e6c9", bg="#1B5E20").pack()
 
-    # Menú dinámico
     menubar = tk.Menu(root)
     menu = tk.Menu(menubar, tearoff=0)
     menu.add_command(label="Actualizar lista", command=cargar_eventos)
@@ -328,7 +339,7 @@ def iniciar_sesion_exitoso():
     else:
         menu.add_separator()
         menu.add_command(label="Crear nuevo evento", command=crear_evento)
-        menu.add_command(label="Ver inscritos del evento", command=ver_inscritos)   # ← AQUÍ ESTÁ
+        menu.add_command(label="Ver inscritos del evento", command=ver_inscritos)
         menu.add_command(label="Eliminar evento seleccionado", command=eliminar_evento)
     
     menu.add_separator()
@@ -336,7 +347,6 @@ def iniciar_sesion_exitoso():
     menubar.add_cascade(label="Menú", menu=menu)
     root.config(menu=menubar)
 
-    # Tabla
     frame = tk.Frame(root)
     frame.pack(fill="both", expand=True, padx=20, pady=20)
     tree_global = ttk.Treeview(frame, columns=("ID","Título","Fecha","Hora","Lugar","Cupo","Inscritos"), show="headings", height=20)
@@ -345,7 +355,6 @@ def iniciar_sesion_exitoso():
         tree_global.column(col, width=160, anchor="center")
     tree_global.pack(fill="both", expand=True)
 
-    # Botones dinámicos
     btns = tk.Frame(root)
     btns.pack(pady=15)
     tk.Button(btns, text="Actualizar", bg="#1976d2", fg="white", command=cargar_eventos).pack(side="left", padx=10)
@@ -355,12 +364,12 @@ def iniciar_sesion_exitoso():
         tk.Button(btns, text="Cancelar Inscripción", bg="#ff9800", fg="white", font=("bold", 12), command=cancelar_inscripcion).pack(side="left", padx=20)
     else:
         tk.Button(btns, text="Crear Evento", bg="#FF5722", fg="white", font=("bold", 12), command=crear_evento).pack(side="left", padx=15)
-        tk.Button(btns, text="Ver Inscritos", bg="#9C27B0", fg="white", font=("bold", 12), command=ver_inscritos).pack(side="left", padx=15)   # ← AQUÍ ESTÁ
+        tk.Button(btns, text="Ver Inscritos", bg="#9C27B0", fg="white", font=("bold", 12), command=ver_inscritos).pack(side="left", padx=15)
         tk.Button(btns, text="Eliminar Evento", bg="#f44336", fg="white", font=("bold", 12), command=eliminar_evento).pack(side="left", padx=15)
 
     cargar_eventos()
 
-# ======================= CARGAR EVENTOS E INSCRIBIRSE (igual) =======================
+# ======================= CARGAR EVENTOS E INSCRIBIRSE =======================
 def cargar_eventos():
     if not tree_global: return
     for i in tree_global.get_children():
@@ -400,17 +409,19 @@ def inscribirse():
         cur.close()
         conn.close()
 
-
+# ======================= MAIN =======================
 def main():
     global root
     root = tk.Tk()
     root.title("Sistema de Eventos - UPSR")
-    root.geometry("1350x780")
+    root.geometry("750x600")
     root.configure(bg="#f0f8ff")
 
-    tk.Label(root, text="SISTEMA DE GESTIÓN\nde Inscripción y Asistencia a Eventos", font=("Helvetica", 26, "bold"), fg="#1B5E20", bg="#f0f8ff").pack(pady=130)
+    tk.Label(root, text="SISTEMA DE GESTIÓN\nde Inscripción y Asistencia a Eventos", 
+             font=("Helvetica", 26, "bold"), fg="#1B5E20", bg="#f0f8ff").pack(pady=130)
     tk.Label(root, text="Oscar Alexandro Morales Galván - ISW-25", font=("Arial", 14), bg="#f0f8ff").pack(pady=10)
-    tk.Button(root, text="INICIAR SISTEMA", bg="#1B5E20", fg="white", font=("bold", 20), width=30, height=2, command=login).pack(pady=60)
+    tk.Button(root, text="INICIAR SISTEMA", bg="#1B5E20", fg="white", 
+              font=("bold", 20), width=30, height=2, command=login).pack(pady=60)
 
     root.mainloop()
 
