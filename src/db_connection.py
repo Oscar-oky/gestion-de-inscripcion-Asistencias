@@ -1,11 +1,10 @@
-# db_connection.py
 import mysql.connector
 
 def get_conn():
     try:
         connection = mysql.connector.connect(
             host='localhost',
-            database='eventos_isw25',   # o el nombre que usaste
+            database='eventos_isw25',   
             user='root',
             password='mysqloscar12'   
         )
