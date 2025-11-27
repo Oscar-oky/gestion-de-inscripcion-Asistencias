@@ -1,6 +1,6 @@
 # src/execute_events.py
-# VERSIÓN FINAL CON ELIMINAR EVENTOS - ENTREGA 10/10/2025
-# Oscar Alexandro Morales Galván - ISW-25
+# VERSIÓN FINAL DEFINITIVA + VER INSCRITOS - PROYECTO PERFECTO PARA OPTATIVA POO
+# Oscar Alexandro Morales Galván - ISW-25 - ENTREGA 10/10/2025
 
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
@@ -34,7 +34,94 @@ current_user = None
 root = None
 tree_global = None
 
-# ======================= ELIMINAR EVENTO (NUEVO) =======================
+# ======================= NUEVA FUNCIÓN: VER INSCRITOS POR EVENTO =======================
+def ver_inscritos():
+    if current_user.rol != "organizador":
+        messagebox.showwarning("Acceso denegado", "Solo los organizadores pueden ver la lista de inscritos")
+        return
+
+    sel = tree_global.selection()
+    if not sel:
+        messagebox.showwarning("Seleccionar", "Por favor selecciona un evento de la lista")
+        return
+
+    evento_data = tree_global.item(sel[0])["values"]
+    evento_id = evento_data[0]
+    titulo_evento = evento_data[1]
+
+    # Ventana con lista de inscritos
+    win = tk.Toplevel(root)
+    win.title(f"Inscritos - {titulo_evento}")
+    win.geometry("1000x720")
+    win.configure(bg="#f0f8ff")
+    win.grab_set()
+
+    tk.Label(win, text="LISTA DE INSCRITOS", font=("Helvetica", 18, "bold"), fg="#1B5E20", bg="#f0f8ff").pack(pady=15)
+    tk.Label(win, text=titulo_evento, font=("Helvetica", 16), fg="#2E7D32", bg="#f0f8ff").pack(pady=5)
+
+    tree = ttk.Treeview(win, columns=("ID", "Nombre", "Apellidos", "Correo", "Teléfono"), show="headings", height=20)
+    tree.heading("ID", text="ID")
+    tree.heading("Nombre", text="Nombre")
+    tree.heading("Apellidos", text="Apellidos")
+    tree.heading("Correo", text="Correo")
+    tree.heading("Teléfono", text="Teléfono")
+    for col in tree["columns"]:
+        tree.column(col, width=180, anchor="center")
+    tree.pack(fill="both", expand=True, padx=30, pady=10)
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT u.id, u.nombre, u.apellidos, u.email, COALESCE(u.telefono, 'No registrado')
+        FROM inscripciones i
+        JOIN usuarios u ON i.usuario_id = u.id
+        WHERE i.evento_id = %s AND i.estado = 'confirmada'
+        ORDER BY u.apellidos, u.nombre
+    """, (evento_id,))
+    
+    total = 0
+    for row in cur.fetchall():
+        tree.insert("", "end", values=row)
+        total += 1
+
+    cur.close()
+    conn.close()
+
+    tk.Label(win, text=f"Total inscritos: {total}", font=("Arial", 14, "bold"), bg="#f0f8ff", fg="#1976d2").pack(pady=10)
+    tk.Button(win, text="Cerrar", bg="#d32f2f", fg="white", font=("bold", 12), command=win.destroy).pack(pady=10)
+
+# ======================= CANCELAR INSCRIPCIÓN =======================
+def cancelar_inscripcion():
+    if current_user.rol != "usuario":
+        messagebox.showwarning("Acceso", "Solo los usuarios pueden cancelar su inscripción")
+        return
+
+    sel = tree_global.selection()
+    if not sel:
+        messagebox.showwarning("Seleccionar", "Selecciona un evento al que estés inscrito")
+        return
+
+    evento_data = tree_global.item(sel[0])["values"]
+    evento_id = evento_data[0]
+    titulo = evento_data[1]
+
+    if messagebox.askyesno("Cancelar inscripción", f"¿Cancelar tu inscripción al evento?\n\n{titulo}"):
+        try:
+            conn = get_conn()
+            cur = conn.cursor()
+            cur.execute("DELETE FROM inscripciones WHERE usuario_id = %s AND evento_id = %s", (current_user.id, evento_id))
+            if cur.rowcount > 0:
+                conn.commit()
+                messagebox.showinfo("Éxito", f"Inscripción cancelada:\n{titulo}")
+                cargar_eventos()
+            else:
+                messagebox.showwarning("No inscrito", f"No estás inscrito en:\n{titulo}")
+            cur.close()
+            conn.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cancelar:\n{e}")
+
+# ======================= ELIMINAR EVENTO =======================
 def eliminar_evento():
     if current_user.rol != "organizador":
         messagebox.showwarning("Acceso denegado", "Solo los organizadores pueden eliminar eventos")
@@ -49,20 +136,20 @@ def eliminar_evento():
     evento_id = evento_data[0]
     titulo = evento_data[1]
 
-    if messagebox.askyesno("Confirmar eliminación", 
-        f"¿Estás seguro de eliminar el evento?\n\n{titulo}\n\nEsta acción NO se puede deshacer."):
+    if messagebox.askyesno("Eliminar evento", f"¿Eliminar permanentemente?\n\n{titulo}\n\nSe cancelarán todas las inscripciones."):
         try:
             conn = get_conn()
             cur = conn.cursor()
             cur.execute("DELETE FROM inscripciones WHERE evento_id = %s", (evento_id,))
             cur.execute("DELETE FROM eventos WHERE id = %s", (evento_id,))
             conn.commit()
-            cur.close()
-            conn.close()
-            messagebox.showinfo("Éxito", f"Evento eliminado correctamente:\n{titulo}")
+            messagebox.showinfo("Éxito", "Evento eliminado correctamente")
             cargar_eventos()
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo eliminar:\n{e}")
+            messagebox.showerror("Error", str(e))
+        finally:
+            cur.close()
+            conn.close()
 
 # ======================= CREAR EVENTO =======================
 def crear_evento():
@@ -215,13 +302,13 @@ def login():
     else:
         registrar_usuario()
 
-# ======================= INTERFAZ PRINCIPAL CON BOTÓN ELIMINAR =======================
+# ======================= INTERFAZ PRINCIPAL CON BOTÓN "VER INSCRITOS" =======================
 def iniciar_sesion_exitoso():
     global tree_global
     for w in root.winfo_children():
         w.destroy()
 
-    root.title(f"Eventos UPSR - {current_user.nombre} {current_user.apellidos}")
+    root.title(f"Eventos UPSR - {current_user.nombre} {current_user.apellidos} ({current_user.rol.upper()})")
 
     # Header
     header = tk.Frame(root, bg="#1B5E20", height=110)
@@ -229,15 +316,21 @@ def iniciar_sesion_exitoso():
     tk.Label(header, text="Gestión de Inscripción y Asistencia a Eventos", font=("Helvetica", 18, "bold"), fg="white", bg="#1B5E20").pack(pady=20)
     tk.Label(header, text="Oscar Alexandro Morales Galván | ISW-25 | 10/10/2025", fg="#c8e6c9", bg="#1B5E20").pack()
 
-    # Menú
+    # Menú dinámico
     menubar = tk.Menu(root)
     menu = tk.Menu(menubar, tearoff=0)
-    menu.add_command(label="Actualizar", command=cargar_eventos)
-    menu.add_command(label="Inscribirme", command=inscribirse)
-    if current_user.rol == "organizador":
+    menu.add_command(label="Actualizar lista", command=cargar_eventos)
+    
+    if current_user.rol == "usuario":
         menu.add_separator()
-        menu.add_command(label="Crear evento", command=crear_evento)
+        menu.add_command(label="Inscribirme a evento", command=inscribirse)
+        menu.add_command(label="Cancelar mi inscripción", command=cancelar_inscripcion)
+    else:
+        menu.add_separator()
+        menu.add_command(label="Crear nuevo evento", command=crear_evento)
+        menu.add_command(label="Ver inscritos del evento", command=ver_inscritos)   # ← AQUÍ ESTÁ
         menu.add_command(label="Eliminar evento seleccionado", command=eliminar_evento)
+    
     menu.add_separator()
     menu.add_command(label="Cerrar sesión", command=lambda: globals().update(current_user=None) or login())
     menubar.add_cascade(label="Menú", menu=menu)
@@ -252,17 +345,22 @@ def iniciar_sesion_exitoso():
         tree_global.column(col, width=160, anchor="center")
     tree_global.pack(fill="both", expand=True)
 
-    # Botones
+    # Botones dinámicos
     btns = tk.Frame(root)
-    btns.pack(pady=10)
+    btns.pack(pady=15)
     tk.Button(btns, text="Actualizar", bg="#1976d2", fg="white", command=cargar_eventos).pack(side="left", padx=10)
-    tk.Button(btns, text="Inscribirme", bg="#4caf50", fg="white", command=inscribirse).pack(side="left", padx=20)
-    if current_user.rol == "organizador":
-        tk.Button(btns, text="Crear Evento", bg="#FF5722", fg="white", command=crear_evento).pack(side="left", padx=10)
-        tk.Button(btns, text="Eliminar Evento", bg="#f44336", fg="white", font=("bold", 12), command=eliminar_evento).pack(side="left", padx=10)
+
+    if current_user.rol == "usuario":
+        tk.Button(btns, text="Inscribirme", bg="#4caf50", fg="white", font=("bold", 12), command=inscribirse).pack(side="left", padx=20)
+        tk.Button(btns, text="Cancelar Inscripción", bg="#ff9800", fg="white", font=("bold", 12), command=cancelar_inscripcion).pack(side="left", padx=20)
+    else:
+        tk.Button(btns, text="Crear Evento", bg="#FF5722", fg="white", font=("bold", 12), command=crear_evento).pack(side="left", padx=15)
+        tk.Button(btns, text="Ver Inscritos", bg="#9C27B0", fg="white", font=("bold", 12), command=ver_inscritos).pack(side="left", padx=15)   # ← AQUÍ ESTÁ
+        tk.Button(btns, text="Eliminar Evento", bg="#f44336", fg="white", font=("bold", 12), command=eliminar_evento).pack(side="left", padx=15)
 
     cargar_eventos()
 
+# ======================= CARGAR EVENTOS E INSCRIBIRSE (igual) =======================
 def cargar_eventos():
     if not tree_global: return
     for i in tree_global.get_children():
@@ -292,7 +390,7 @@ def inscribirse():
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("INSERT INTO inscripciones (usuario_id, evento_id) VALUES (%s, %s)", (current_user.id, evento_id))
+        cur.execute("INSERT INTO inscripciones (usuario_id, evento_id, estado) VALUES (%s, %s, 'confirmada')", (current_user.id, evento_id))
         conn.commit()
         messagebox.showinfo("Éxito", "¡Inscrito correctamente!")
         cargar_eventos()
@@ -302,14 +400,19 @@ def inscribirse():
         cur.close()
         conn.close()
 
-# ======================= INICIO =======================
-root = tk.Tk()
-root.title("Sistema de Eventos - UPSR")
-root.geometry("1350x780")
-root.configure(bg="#f0f8ff")
 
-tk.Label(root, text="SISTEMA DE GESTIÓN\nde Inscripción y Asistencia a Eventos", font=("Helvetica", 26, "bold"), fg="#1B5E20", bg="#f0f8ff").pack(pady=130)
-tk.Label(root, text="Oscar Alexandro Morales Galván - ISW-25", font=("Arial", 14), bg="#f0f8ff").pack(pady=10)
-tk.Button(root, text="INICIAR SISTEMA", bg="#1B5E20", fg="white", font=("bold", 20), width=30, height=2, command=login).pack(pady=60)
+def main():
+    global root
+    root = tk.Tk()
+    root.title("Sistema de Eventos - UPSR")
+    root.geometry("1350x780")
+    root.configure(bg="#f0f8ff")
 
-root.mainloop()
+    tk.Label(root, text="SISTEMA DE GESTIÓN\nde Inscripción y Asistencia a Eventos", font=("Helvetica", 26, "bold"), fg="#1B5E20", bg="#f0f8ff").pack(pady=130)
+    tk.Label(root, text="Oscar Alexandro Morales Galván - ISW-25", font=("Arial", 14), bg="#f0f8ff").pack(pady=10)
+    tk.Button(root, text="INICIAR SISTEMA", bg="#1B5E20", fg="white", font=("bold", 20), width=30, height=2, command=login).pack(pady=60)
+
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
