@@ -11,7 +11,7 @@ def hash_password(pwd):
     return hashlib.sha256(pwd.encode()).hexdigest()
 
 # ======================= CONTRASEÑA MAESTRA =======================
-CONTRASEÑA_MAESTRA = "upsrc2025"  # Cambia esta si quieres
+CONTRASEÑA_MAESTRA = "contraseña"  # Cambia esta si quieres
 
 # ======================= CLASES POO =======================
 class Persona:
@@ -161,7 +161,7 @@ def crear_evento():
 
     win = tk.Toplevel(root)
     win.title("Crear Nuevo Evento")
-    win.geometry("520x750")
+    win.geometry("750x750")
     win.configure(bg="#f0f8ff")
     win.grab_set()
 
@@ -414,7 +414,7 @@ def main():
     global root
     root = tk.Tk()
     root.title("Sistema de Eventos - UPSR")
-    root.geometry("750x600")
+    root.geometry("750x750")
     root.configure(bg="#f0f8ff")
 
     tk.Label(root, text="SISTEMA DE GESTIÓN\nde Inscripción y Asistencia a Eventos", 
